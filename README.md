@@ -20,11 +20,17 @@
   <p style="color:#b1c2d4;font-size:0.95em;margin:0 0 10px;line-height:1.5">
     This repository is built for <strong>Track 1: MemoryAgent</strong>. It implements an autonomous, long-running agentic harness featuring a <strong>Dirac-inspired Dynamic Complexity Router</strong> and a <strong>Quantum-Inspired Ontological Memory Harness</strong>.
   </p>
-  <ul style="color:#b1c2d4;font-size:0.9em;margin:0;padding-left:20px;line-height:1.5">
-    <li><strong>Qwen Cloud Native</strong>: Optimized prompt templates, structured output maps, and thinking budget configurations built specifically for <code>qwen-plus</code> and <code>qwen-turbo</code>.</li>
-    <li><strong>Dirac State Routing</strong>: Models query state as a Hilbert superposition and collapses it dynamically to execute direct, RAG, or full tool loops.</li>
-    <li><strong>Quantum Memory Harness</strong>: Cosine + phase interference scoring (<code>S_fused = α·S_cos + β·S_interfere</code>) with spontaneous symmetry breaking and dissipative temporal decay.</li>
-  </ul>
+  <div style="margin-top:15px;background:rgba(0,0,0,0.25);border:1px solid rgba(28,176,246,0.2);border-radius:6px;padding:12px">
+    <h4 style="color:#1cb0f6;margin-top:0;font-family:'Courier New',Courier,monospace">📖 Deep Quantum Architecture Specifications:</h4>
+    <ul style="color:#b1c2d4;font-size:0.9em;margin:0;padding-left:20px;line-height:1.6">
+      <li>🌌 <strong><a href="doc/quantum/dirac_complexity_routing.md" style="color:#3cd2a5;text-decoration:none">Dirac Complexity Routing</a></strong>: Superposition state vector projection $| \psi \rangle = c_s | \text{Simple} \rangle + c_d | \text{Complicated} \rangle + c_x | \text{Complex} \rangle$ and measurement collapse.</li>
+      <li>⚛️ <strong><a href="doc/quantum/quantum_ontological_memory.md" style="color:#3cd2a5;text-decoration:none">Quantum Ontological Memory</a></strong>: Cosine + phase wave interference ($S_{fused} = \alpha \cdot S_{cos} + \beta \cdot \cos(\theta_q - \theta_m)$) and entanglement twin pairing.</li>
+      <li>💾 <strong><a href="doc/quantum/semantic_cache_dissipative_decay.md" style="color:#3cd2a5;text-decoration:none">Semantic Cache & Dissipative Decay</a></strong>: Concept density matrices ($\rho$) and exponential threshold shift decay ($T(t) = T_0 + (1 - T_0)(1 - e^{-\Gamma t})$) over time.</li>
+      <li>🛡️ <strong><a href="doc/quantum/cache_verification_loop.md" style="color:#3cd2a5;text-decoration:none">QFT Cache Verification Loop</a></strong>: RAG/Verification pipeline, model existence validation, and semantic LLM verification passes.</li>
+      <li>🔗 <strong><a href="doc/quantum/ontological_rag_injector.md" style="color:#3cd2a5;text-decoration:none">Ontological RAG Injector</a></strong>: Semantic vector embedding lookup and context envelope hydration.</li>
+      <li>🕸️ <strong><a href="doc/quantum/cognitive_graph_memory.md" style="color:#3cd2a5;text-decoration:none">Cognitive Graph Memory</a></strong>: Fact triplet extraction, deduplication, edge weights coherence, and temporal graph decay.</li>
+    </ul>
+  </div>
 </div>
 
 ---
