@@ -1,0 +1,44 @@
+{
+    "name": "kai/phpkaiharness",
+    "description": "A pluggable agent harness framework for PHP supporting dynamic tool registries, microservice tools, and Kali WSL execution.",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Kai",
+            "email": "kai@example.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2 || ^8.3 || ^8.4 || ^8.5",
+        "guzzlehttp/guzzle": "^7.8 || ^8.0",
+        "psr/log": "^3.0",
+        "laravel/ai": "^0.7.0 || ^0.8.0",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0 || ^11.0 || ^12.0",
+        "laravel/framework": "^11.0 || ^12.0 || ^13.0",
+        "vlucas/phpdotenv": "^5.6",
+        "phpoption/phpoption": "^1.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "Phpkaiharness\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Phpkaiharness\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Phpkaiharness\\PhpkaiharnessServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

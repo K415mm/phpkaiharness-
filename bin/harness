@@ -1,0 +1,485 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * phpkaiharness CLI
+ *
+ * Commands:
+ *   run "prompt"                     Run an agent prompt (auto-monitored)
+ *   monitor:stats                    Show aggregated usage statistics
+ *   monitor:sessions [--limit N]     List recent sessions
+ *   monitor:session {id}             Show full detail for one session
+ *   serve [--port N] [--host H]      Launch the web monitoring dashboard
+ */
+
+use Illuminate\Contracts\Console\Kernel;
+use Laravel\Ai\Ai;
+use Phpkaiharness\Core\AgentLoop;
+use Phpkaiharness\Core\AgentSelector;
+use Phpkaiharness\Core\Registry\ToolRegistry;
+use Phpkaiharness\Llm\LaravelAiClient;
+use Phpkaiharness\Llm\LmStudioClient;
+use Phpkaiharness\Llm\OllamaClient;
+use Phpkaiharness\Llm\OpenRouterClient;
+use Phpkaiharness\Monitor\MonitorReport;
+use Phpkaiharness\Monitor\SqliteMonitorStore;
+use Phpkaiharness\Optimize\ContextCompactor;
+use Phpkaiharness\Optimize\Guardrails;
+use Phpkaiharness\Optimize\SemanticCache;
+use Phpkaiharness\Tools\WslCommandTool;
+use Psr\Log\AbstractLogger;
+
+$autoloader = null;
+foreach ([__DIR__.'/../vendor/autoload.php', __DIR__.'/../../../vendor/autoload.php'] as $path) {
+    if (file_exists($path)) {
+        $autoloader = $path;
+        break;
+    }
+}
+
+if (! $autoloader) {
+    fwrite(STDERR, "Error: Dependencies not installed. Run 'composer install'\n");
+    exit(1);
+}
+
+require $autoloader;
+
+// Bootstrap Laravel if available to support laravel_ai provider and App\ namespace classes
+$laravelRoot = null;
+$possibleRoots = [
+    __DIR__.'/../../..',
+    getenv('LARAVEL_PATH') ?: null,
+    '/mnt/s/elasticcost',
+    '/home/kais/elasticcost',
+];
+
+foreach ($possibleRoots as $root) {
+    if ($root && file_exists($root.'/bootstrap/app.php')) {
+        $laravelRoot = realpath($root);
+        break;
+    }
+}
+
+if ($laravelRoot) {
+    // If the main app autoloader is different from the package's autoloader, require it
+    $appAutoloader = $laravelRoot.'/vendor/autoload.php';
+    if ($appAutoloader && file_exists($appAutoloader) && realpath($appAutoloader) !== realpath($autoloader)) {
+        require $appAutoloader;
+    }
+
+    $laravelApp = require $laravelRoot.'/bootstrap/app.php';
+    $laravelKernel = $laravelApp->make(Kernel::class);
+    $laravelKernel->bootstrap();
+}
+
+// ── ANSI colour constants ────────────────────────────────────────────────────
+const R = "\033[0m";       // reset
+const B = "\033[1m";       // bold
+const DM = "\033[2m";       // dim
+const PU = "\033[35m";      // purple
+const CY = "\033[36m";      // cyan
+const GR = "\033[32m";      // green
+const YL = "\033[33m";      // yellow
+const RD = "\033[31m";      // red
+const BL = "\033[34m";      // blue
+
+// ── Argument parsing ─────────────────────────────────────────────────────────
+$rawArgs = array_slice($argv, 1);
+$command = array_shift($rawArgs) ?? 'help';
+
+$flags = [];
+$positional = [];
+
+while (! empty($rawArgs)) {
+    $arg = array_shift($rawArgs);
+    if (str_starts_with($arg, '--')) {
+        $key = ltrim($arg, '-');
+        if (! empty($rawArgs) && ! str_starts_with($rawArgs[0], '--')) {
+            $flags[$key] = array_shift($rawArgs);
+        } else {
+            $flags[$key] = true;
+        }
+    } else {
+        $positional[] = $arg;
+    }
+}
+
+$dbPath = getenv('PHPKAIHARNESS_DB') ?: SqliteMonitorStore::defaultDbPath();
+
+// ── Dispatch ─────────────────────────────────────────────────────────────────
+match ($command) {
+    'run' => cmdRun($positional, $flags, $dbPath),
+    'monitor:stats' => cmdStats($dbPath),
+    'monitor:sessions' => cmdSessions($dbPath, $flags),
+    'monitor:session' => cmdSession($dbPath, $positional[0] ?? null),
+    'serve' => cmdServe($flags),
+    default => cmdHelp(),
+};
+
+// ═══════════════════════════════ Commands ════════════════════════════════════
+
+function cmdRun(array $positional, array $flags, string $dbPath): void
+{
+    $prompt = $positional[0] ?? null;
+
+    if (empty($prompt)) {
+        fwrite(STDERR, "Usage: php bin/harness run \"your prompt\" [--provider PROVIDER] [--agent AGENT] [--url URL] [--model MODEL] [--apikey KEY]\n");
+        exit(1);
+    }
+
+    $provider = $flags['provider'] ?? 'ollama';
+    $model = $flags['model'] ?? '';
+
+    // Resolve agent details if --agent is specified
+    $agentName = $flags['agent'] ?? null;
+    $systemPrompt = 'You are a Kali WSL security assistant. Use your tools to run network diagnostics and report findings.';
+
+    if ($agentName) {
+        $discovered = AgentSelector::discover();
+        $matchedAgent = null;
+        foreach ($discovered as $da) {
+            if (strcasecmp($da['name'], $agentName) === 0 || strcasecmp($da['class'], $agentName) === 0) {
+                $matchedAgent = $da;
+                break;
+            }
+        }
+
+        if ($matchedAgent) {
+            $systemPrompt = $matchedAgent['instructions'];
+            if (empty($model)) {
+                $model = $matchedAgent['model'];
+            }
+            if (empty($flags['provider']) && ! empty($matchedAgent['provider'])) {
+                $provider = $matchedAgent['provider'];
+            }
+            $agentDisplayName = $matchedAgent['name'];
+        } else {
+            // Check FQCN directly
+            if (class_exists($agentName)) {
+                try {
+                    $instance = new $agentName;
+                    if (method_exists($instance, 'instructions')) {
+                        $systemPrompt = (string) $instance->instructions();
+                        $agentDisplayName = $agentName;
+                    } else {
+                        $agentDisplayName = 'custom';
+                    }
+                } catch (Throwable $e) {
+                    fwrite(STDERR, RD.'⚠️  Could not load agent class: '.$e->getMessage()."\n".R);
+                    $agentDisplayName = 'custom';
+                }
+            } else {
+                fwrite(STDERR, YL."⚠️  Agent '$agentName' not found in App\Ai\Agents. Using fallback prompt.\n".R);
+                $agentDisplayName = 'fallback';
+            }
+        }
+    } else {
+        $agentDisplayName = 'security-assistant';
+    }
+
+    if (empty($model)) {
+        $model = $provider === 'lmstudio' ? 'lmstudio-community/gemma-2b-it-GGUF' : 'hermes-3-llama-3-8b';
+    }
+
+    // Instantiate LLM client
+    if ($provider === 'laravel_ai') {
+        $connectionName = $flags['connection'] ?? (class_exists(Ai::class) ? config('ai.default', 'ollama') : 'ollama');
+        $llmClient = new LaravelAiClient($connectionName, $model);
+        $providerInfo = "Laravel AI ($connectionName)";
+    } elseif ($provider === 'lmstudio') {
+        $lmstudioUrl = $flags['url'] ?? (getenv('PHPKAIHARNESS_LMSTUDIO_URL') ?: 'http://localhost:1234');
+        $llmClient = new LmStudioClient($lmstudioUrl, $model);
+        $providerInfo = "LM Studio ($lmstudioUrl)";
+    } elseif ($provider === 'openrouter') {
+        $apiKey = $flags['apikey'] ?? (getenv('OPENROUTER_API_KEY') ?: '');
+        $llmClient = new OpenRouterClient($apiKey, $model);
+        $providerInfo = 'OpenRouter';
+    } else {
+        $ollamaUrl = $flags['url'] ?? (getenv('PHPKAIHARNESS_URL') ?: 'http://localhost:11434');
+        $llmClient = new OllamaClient($ollamaUrl, $model);
+        $providerInfo = "Ollama ($ollamaUrl)";
+    }
+
+    printHeader();
+    echo CY.B."🤖 Running agent\n".R;
+    echo DM."   Agent:      $agentDisplayName\n";
+    echo "   Model:      $model\n";
+    echo "   Provider:   $providerInfo\n";
+    echo "   Monitor DB: $dbPath\n".R."\n";
+
+    $store = new SqliteMonitorStore($dbPath);
+    $sessionId = bin2hex(random_bytes(8));
+
+    $logger = new class extends AbstractLogger
+    {
+        public function log($level, string|Stringable $message, array $context = []): void
+        {
+            fwrite(STDERR, DM.'['.strtoupper($level).'] '.$message."\n".R);
+        }
+    };
+
+    $registry = new ToolRegistry;
+    $registry->attach(new WslCommandTool(
+        name: 'wsl_security_tool',
+        description: 'Runs security diagnostics (ping, dig, whois, curl, nslookup).',
+        allowedBinaries: ['ping', 'dig', 'whois', 'curl', 'nslookup']
+    ));
+
+    $agent = new AgentLoop(
+        llmClient: $llmClient,
+        registry: $registry,
+        systemPrompt: $systemPrompt,
+        model: $model,
+        maxIterations: 5,
+        logger: $logger
+    );
+
+    if (isset($flags['cache'])) {
+        $agent->setSemanticCache(new SemanticCache(
+            pdo: $store->getPdo(),
+            threshold: 0.88
+        ));
+        echo DM."   Optimizations: [Semantic Cache Enabled]\n".R;
+    }
+
+    if (isset($flags['compact'])) {
+        $agent->setContextCompactor(new ContextCompactor(
+            strategy: 'sliding_window',
+            maxTurns: 4
+        ));
+        echo DM."   Optimizations: [Context Window Compactor Enabled]\n".R;
+    }
+
+    if (isset($flags['guard'])) {
+        $agent->setGuardrails(new Guardrails);
+        echo DM."   Optimizations: [Safety Guardrails Enabled]\n".R;
+    }
+
+    $history = [];
+
+    try {
+        $store->startSession($sessionId, $prompt, 'cli-run ('.$agentDisplayName.')');
+        $startTime = microtime(true);
+        $response = $agent->run($prompt, $history, $sessionId, $store);
+        $durationMs = (int) ((microtime(true) - $startTime) * 1000);
+
+        echo "\n".B.GR."✅ Response:\n".R;
+        echo $response."\n";
+        echo "\n".DM."Session ID: $sessionId | Duration: ".number_format($durationMs)."ms\n".R;
+        echo DM."View in dashboard: php bin/harness serve\n".R."\n";
+    } catch (Exception $e) {
+        fwrite(STDERR, RD.'⚠️  Agent Error: '.$e->getMessage()."\n".R);
+        exit(1);
+    }
+}
+
+function cmdStats(string $dbPath): void
+{
+    printHeader();
+    requireDb($dbPath);
+
+    $report = new MonitorReport($dbPath);
+    $stats = $report->getStats();
+    $total = $stats['total_prompt_tokens'] + $stats['total_completion_tokens'];
+
+    echo B.CY."📊 Statistics\n".R;
+    echo str_repeat('═', 52)."\n";
+    printStat('Total Sessions', number_format($stats['total_sessions']));
+    printStat('Total LLM Calls', number_format($stats['total_llm_calls']));
+    printStat('Total Tool Calls', number_format($stats['total_tool_calls']));
+    printStat('Prompt Tokens', number_format($stats['total_prompt_tokens']));
+    printStat('Completion Tokens', number_format($stats['total_completion_tokens']));
+    printStat('Total Tokens', number_format($total));
+    printStat('Avg Duration', number_format($stats['avg_duration_ms']).'ms');
+    printStat('Fast-Path Saves', number_format($stats['fast_path_saves']));
+    echo str_repeat('═', 52)."\n\n";
+
+    if (! empty($stats['methods'])) {
+        echo B."Routing Methods:\n".R;
+        $maxCount = max(array_column($stats['methods'], 'count'));
+        foreach ($stats['methods'] as $m) {
+            $pct = $stats['total_sessions'] > 0
+                ? round($m['count'] / $stats['total_sessions'] * 100)
+                : 0;
+            $barLen = $maxCount > 0 ? (int) round($m['count'] / $maxCount * 28) : 0;
+            $bar = PU.str_repeat('█', $barLen).R;
+            printf("  %-36s %s %s (%d%%)\n",
+                $m['method'], $bar, CY.$m['count'].R, $pct
+            );
+        }
+    }
+    echo "\n";
+}
+
+function cmdSessions(string $dbPath, array $flags): void
+{
+    printHeader();
+    requireDb($dbPath);
+
+    $limit = (int) ($flags['limit'] ?? 20);
+    $report = new MonitorReport($dbPath);
+    $sessions = $report->getSessions($limit);
+    $total = $report->getSessionCount();
+
+    echo B.CY."📋 Recent Sessions (last {$limit} of {$total})\n".R;
+    echo str_repeat('─', 112)."\n";
+    printf(DM." %-18s │ %-30s │ %9s │ %7s │ %s\n".R,
+        'ID', 'Method', 'Duration', 'Tokens', 'Prompt'
+    );
+    echo str_repeat('─', 112)."\n";
+
+    foreach ($sessions as $s) {
+        $idShort = substr($s['id'], 0, 16).'…';
+        $tokens = ($s['tokens_prompt'] ?? 0) + ($s['tokens_completion'] ?? 0);
+        $preview = mb_substr(preg_replace('/\s+/', ' ', $s['prompt']), 0, 45);
+        $method = $s['method'];
+        $mColor = match (true) {
+            str_contains($method, 'fast-path') => GR,
+            str_contains($method, 'action') => YL,
+            str_contains($method, 'cli') => BL,
+            default => CY,
+        };
+        printf(' %-18s │ %s%-30s'.R." │ %9s │ %7s │ %s\n",
+            $idShort,
+            $mColor, mb_substr($method, 0, 30),
+            number_format($s['total_duration_ms'] ?? 0).'ms',
+            number_format($tokens),
+            $preview
+        );
+    }
+    echo str_repeat('─', 112)."\n\n";
+}
+
+function cmdSession(string $dbPath, ?string $id): void
+{
+    if (empty($id)) {
+        fwrite(STDERR, "Usage: php bin/harness monitor:session <session-id>\n");
+        exit(1);
+    }
+
+    printHeader();
+    requireDb($dbPath);
+
+    $report = new MonitorReport($dbPath);
+    $session = $report->getSession($id);
+
+    if (! $session) {
+        echo RD."Session not found: $id\n".R;
+        exit(1);
+    }
+
+    echo B.CY."🔍 Session Detail\n".R;
+    echo str_repeat('═', 80)."\n";
+    printStat('ID', $session['id']);
+    printStat('Method', $session['method']);
+    printStat('Duration', number_format($session['total_duration_ms']).'ms');
+    printStat('Iterations', (string) $session['iterations']);
+    printStat('Created', $session['created_at']);
+    echo "\n";
+    echo B."Prompt:\n".R.DM.$session['prompt']."\n".R."\n";
+    echo B."Response:\n".R.$session['response']."\n\n";
+
+    if (! empty($session['details'])) {
+        echo B."Steps:\n".R;
+        echo str_repeat('─', 80)."\n";
+
+        foreach ($session['details'] as $i => $d) {
+            $typeLabel = $d['type'] === 'llm_call'
+                ? PU.'[LLM]  '.R
+                : YL.'[TOOL] '.R;
+
+            echo $typeLabel.B.$d['name'].R;
+
+            $tokenInfo = $d['type'] === 'llm_call'
+                ? "  PT:{$d['tokens_prompt']}  CT:{$d['tokens_completion']}"
+                : '';
+
+            echo DM."  {$d['duration_ms']}ms{$tokenInfo}\n".R;
+
+            $payload = json_decode($d['payload'] ?? '{}', true) ?? [];
+            $response = $d['response'] ?? '';
+
+            $payloadStr = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $payloadPrev = mb_substr($payloadStr, 0, 300);
+            $respPrev = mb_substr($response, 0, 300);
+
+            echo DM.'  ↳ Payload:  '.R.$payloadPrev.(mb_strlen($payloadStr) > 300 ? '…' : '')."\n";
+            echo DM.'  ↳ Response: '.R.$respPrev.(mb_strlen($response) > 300 ? '…' : '')."\n\n";
+        }
+    }
+}
+
+function cmdServe(array $flags): void
+{
+    $port = (int) ($flags['port'] ?? 8765);
+    $host = $flags['host'] ?? '0.0.0.0';
+    $uiDir = realpath(__DIR__.'/../ui');
+    $router = $uiDir.'/router.php';
+
+    if (! is_dir((string) $uiDir)) {
+        fwrite(STDERR, RD.'UI directory not found. Expected: '.dirname(__DIR__)."/ui\n".R);
+        exit(1);
+    }
+
+    printHeader();
+    echo B.GR."🚀 Launching Web Dashboard\n".R;
+    echo CY."   → http://localhost:{$port}\n".R;
+    echo DM.'   DB: '.SqliteMonitorStore::defaultDbPath()."\n";
+    echo "   Press Ctrl+C to stop\n\n".R;
+
+    passthru(sprintf(
+        'php -S %s:%d -t %s %s',
+        escapeshellarg($host),
+        $port,
+        escapeshellarg($uiDir),
+        escapeshellarg($router)
+    ));
+}
+
+function cmdHelp(): void
+{
+    printHeader();
+    echo B."Usage:\n".R;
+    echo '  php bin/harness '.CY.'run'.R.'         '.DM.'"prompt"'.R.' [--provider PROVIDER] [--agent AGENT] [--url URL] [--model MODEL] [--apikey KEY] [--cache] [--compact] [--guard]'."\n";
+    echo '  php bin/harness '.CY.'monitor:stats'.R."\n";
+    echo '  php bin/harness '.CY.'monitor:sessions'.R.' [--limit N]'."\n";
+    echo '  php bin/harness '.CY.'monitor:session'.R.' '.DM.'{session-id}'.R."\n";
+    echo '  php bin/harness '.CY.'serve'.R.'         [--port 8765] [--host 0.0.0.0]'."\n";
+    echo "\n";
+    echo B."Options:\n".R;
+    echo '  '.CY.'--provider'.R.'        LLM provider: ollama|lmstudio|openrouter (default: ollama)'."\n";
+    echo '  '.CY.'--agent'.R.'           Dynamic agent class name (e.g. SizingRegulator, OfferAnalyst)'."\n";
+    echo '  '.CY.'--cache'.R.'           Enable Semantic Caching (Exact + Levenshtein distance)'."\n";
+    echo '  '.CY.'--compact'.R.'         Enable Context Compaction (Sliding window)'."\n";
+    echo '  '.CY.'--guard'.R.'           Enable Safety Guardrails (Blacklists command injections)'."\n";
+    echo "\n";
+    echo B."Environment Variables:\n".R;
+    echo '  '.YL.'PHPKAIHARNESS_DB'.R.'      SQLite DB path (default: ~/.phpkaiharness/monitor.db)'."\n";
+    echo '  '.YL.'PHPKAIHARNESS_URL'.R.'     Ollama URL    (default: http://localhost:11434)'."\n";
+    echo '  '.YL.'PHPKAIHARNESS_MODEL'.R.'   Default model name'."\n";
+    echo '  '.YL.'PHPKAIHARNESS_LMSTUDIO_URL'.R.' LM Studio URL (default: http://localhost:1234)'."\n\n";
+}
+
+// ═══════════════════════════════ Helpers ═════════════════════════════════════
+
+function printHeader(): void
+{
+    echo "\n".PU.B;
+    echo "╔═══════════════════════════════════╗\n";
+    echo "║   🛡  phpkaiharness Monitor    ║\n";
+    echo "╚═══════════════════════════════════╝\n".R."\n";
+}
+
+function printStat(string $label, string $value): void
+{
+    printf('  '.DM.'%-24s'.R.B.'%s'."\n".R, $label.':', $value);
+}
+
+function requireDb(string $dbPath): void
+{
+    if (! file_exists($dbPath)) {
+        echo YL."No monitoring data yet. Run an agent first:\n".R;
+        echo "  php bin/harness run \"your prompt\"\n\n";
+        exit(0);
+    }
+}
