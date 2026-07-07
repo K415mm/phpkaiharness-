@@ -1,11 +1,11 @@
 <div align="center">
   <div style="background:#0c1017;border:2px solid #3cd2a5;border-radius:12px;padding:32px 28px 24px;margin-bottom:24px;box-shadow:0 0 40px rgba(60,210,165,0.2)">
-    <h1 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;letter-spacing:3px;font-weight:bold;margin:0 0 8px">🤖 PHP KAI HARNESS</h1>
-    <p style="color:#8a99ad;font-size:1.1em;margin:0 0 18px">State-of-the-Art Agentic Harness & HUD Telemetry for PHP & Laravel 13</p>
+    <h1 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;letter-spacing:3px;font-weight:bold;margin:0 0 8px">🤖 KAI HARNESS</h1>
+    <p style="color:#8a99ad;font-size:1.1em;margin:0 0 18px">State-of-the-Art Agentic Harness, Standalone Web Application & HUD Telemetry Engine</p>
     <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
       <img src="https://img.shields.io/badge/stable-v2.1.0-3cd2a5.svg?style=flat-square" alt="Stable">
-      <img src="https://img.shields.io/badge/php-%5E8.2%20%7C%20%5E8.3%20%7C%20%5E8.4%20%7C%20%5E8.5-8892BF.svg?style=flat-square" alt="PHP">
-      <img src="https://img.shields.io/badge/laravel-%5E11.0%20%7C%20%5E12.0%20%7C%20%5E13.0-FF2D20.svg?style=flat-square" alt="Laravel">
+      <img src="https://img.shields.io/badge/platform-Standalone%20Web%20App%20%7C%20API-3cd2a5.svg?style=flat-square" alt="Platform">
+      <img src="https://img.shields.io/badge/integration-PHP%20%7C%20Laravel%2013-8892BF.svg?style=flat-square" alt="Integration">
       <img src="https://img.shields.io/badge/tests-93%20passing-3cd2a5.svg?style=flat-square" alt="Tests">
       <img src="https://img.shields.io/badge/Qwen%20Cloud-ready-3cd2a5.svg?style=flat-square" alt="Qwen Cloud">
       <img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat-square" alt="License">
@@ -13,7 +13,7 @@
   </div>
 </div>
 
-`phpkaiharness` is a **production-grade, pluggable AI Agent Harness** for PHP & Laravel 13. It gives you an autonomous LLM execution loop enriched with enterprise-grade safety, optimization, and observability features — all without leaving the PHP ecosystem.
+`phpkaiharness` is a **production-grade, dual-engine AI Agent Harness & Standalone Web Application Dashboard**. It provides an autonomous LLM execution loop enriched with enterprise-grade safety, optimization, and observability features — running both as a standalone Web App (via a built-in API router) or seamlessly integrated as a package inside PHP & Laravel 13 projects.
 
 <div style="background:rgba(28,176,246,0.08);border:1px solid #1cb0f6;border-radius:8px;padding:16px;margin:20px 0;box-shadow:0 0 15px rgba(28,176,246,0.1)">
   <h3 style="color:#1cb0f6;margin-top:0;font-family:'Courier New',Courier,monospace;letter-spacing:1px">🏆 Global AI Hackathon Series — Qwen Cloud Edition</h3>
@@ -32,7 +32,7 @@
 <h2 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;border-bottom:2px solid #3cd2a5;padding-bottom:8px;margin-top:30px">🏗️ Architecture Overview</h2>
 
 <p style="color:#b1c2d4;line-height:1.6">
-  The system uses a <strong>dual-path architecture</strong> where both the host Laravel application and the phpkaiharness package route all LLM calls through <strong>Qwen Cloud (DashScope API)</strong> as the primary AI provider. Credentials are shared from a single source — the host app's <code>global_settings</code> database table — ensuring both paths use the same API key, URL, and model without duplicate configuration.
+  The system uses a <strong>dual-path architecture</strong> where both host web applications and standalone API endpoints route all LLM calls through <strong>Qwen Cloud (DashScope API)</strong> as the primary AI provider. Credentials can be shared dynamically from global database configs or resolved via hybrid configuration chains, ensuring both standalone web views and integrated services use the same API key, URL, and model.
 </p>
 
 <h3 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;margin-top:24px">System Architecture — Dual-Path Qwen Cloud Integration</h3>
