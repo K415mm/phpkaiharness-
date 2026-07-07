@@ -112,27 +112,27 @@ flowchart TB
   <tbody>
     <tr style="border-bottom:1px solid rgba(60,210,165,0.15)">
       <td style="padding:8px;color:#3cd2a5;font-weight:bold">1-2</td>
-      <td style="padding:8px;color:#b1c2d4"><code>AiChatController</code></td>
-      <td style="padding:8px;color:#b1c2d4">Receives user prompt, triggers AI config</td>
-      <td style="padding:8px;color:#b1c2d4">Calls <code>AiConfigHelper::configureMultiModel()</code> to resolve provider</td>
+      <td style="padding:8px;color:#b1c2d4"><strong>Application Gateway / Controller</strong></td>
+      <td style="padding:8px;color:#b1c2d4">Receives user prompt, triggers harness bootstrap and config loading</td>
+      <td style="padding:8px;color:#b1c2d4">Initializes client configuration and validates credentials</td>
     </tr>
     <tr style="border-bottom:1px solid rgba(60,210,165,0.15)">
       <td style="padding:8px;color:#3cd2a5;font-weight:bold">3-5</td>
-      <td style="padding:8px;color:#b1c2d4"><code>AiConfigHelper</code></td>
-      <td style="padding:8px;color:#b1c2d4">Reads <code>global_settings</code> DB table, sets Laravel AI SDK config at runtime</td>
-      <td style="padding:8px;color:#b1c2d4">When <code>ai_provider = 'qwen'</code>: sets <code>ai.providers.qwen.key/url/driver</code> and purges AiManager instance</td>
+      <td style="padding:8px;color:#b1c2d4"><strong>Configuration Resolver</strong></td>
+      <td style="padding:8px;color:#b1c2d4">Resolves credentials from host config file, database settings table, or env variables</td>
+      <td style="padding:8px;color:#b1c2d4">Binds Qwen API keys, URLs, and model profiles dynamically at runtime</td>
     </tr>
     <tr style="border-bottom:1px solid rgba(60,210,165,0.15)">
       <td style="padding:8px;color:#3cd2a5;font-weight:bold">6</td>
-      <td style="padding:8px;color:#b1c2d4"><code>SocEngineerRouter</code></td>
-      <td style="padding:8px;color:#b1c2d4">Intent classification — decides if action is needed</td>
-      <td style="padding:8px;color:#b1c2d4">Uses <strong>light model</strong> (<code>qwen-turbo</code>) via Laravel AI SDK structured output</td>
+      <td style="padding:8px;color:#b1c2d4"><strong>Dirac Complexity Router</strong></td>
+      <td style="padding:8px;color:#b1c2d4">Classifies query complexity in a Hilbert state vector superposition</td>
+      <td style="padding:8px;color:#b1c2d4">Employs a lightweight model profile (e.g. <code>qwen-turbo</code>) to measure complexity and collapse the routing state</td>
     </tr>
     <tr style="border-bottom:1px solid rgba(60,210,165,0.15)">
       <td style="padding:8px;color:#3cd2a5;font-weight:bold">7</td>
-      <td style="padding:8px;color:#b1c2d4"><code>RgSocEngineerMain</code></td>
-      <td style="padding:8px;color:#b1c2d4">Main agent executor — runs the full agent loop with tools</td>
-      <td style="padding:8px;color:#b1c2d4">Uses <strong>main model</strong> (<code>qwen-plus</code>) via <code>LaravelAiClient</code> → <code>QwenClient</code></td>
+      <td style="padding:8px;color:#b1c2d4"><strong>Agent Loop Executor</strong></td>
+      <td style="padding:8px;color:#b1c2d4">Drives multi-turn thought-action loops, tool execution, and memory verification</td>
+      <td style="padding:8px;color:#b1c2d4">Utilizes the main model (e.g. <code>qwen-plus</code>) for agentic execution and tools interaction</td>
     </tr>
     <tr style="border-bottom:1px solid rgba(60,210,165,0.15)">
       <td style="padding:8px;color:#3cd2a5;font-weight:bold">8-9</td>
