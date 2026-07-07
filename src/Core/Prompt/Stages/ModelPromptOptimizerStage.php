@@ -14,6 +14,10 @@ class ModelPromptOptimizerStage implements PromptProcessorInterface
 {
     public function isEnabled(PromptContext $context): bool
     {
+        if (isset($context->philosophyFlags['use_optimizer']) && ! $context->philosophyFlags['use_optimizer']) {
+            return false;
+        }
+
         if (! function_exists('config')) {
             return false;
         }

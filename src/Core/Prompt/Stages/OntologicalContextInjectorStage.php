@@ -18,6 +18,10 @@ class OntologicalContextInjectorStage implements PromptProcessorInterface
 {
     public function isEnabled(PromptContext $context): bool
     {
+        if (isset($context->philosophyFlags['use_ontology']) && ! $context->philosophyFlags['use_ontology']) {
+            return false;
+        }
+
         if (! function_exists('config')) {
             return false;
         }

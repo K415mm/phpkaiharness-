@@ -163,6 +163,7 @@ class HarnessConfigController extends Controller
     private function buildUpdatedConfig(Request $request): array
     {
         return [
+            'config_mode' => $request->input('config_mode', config('harness.config_mode', 'force')),
             'default' => [
                 'provider' => $request->input('default_provider', config('harness.default.provider')),
                 'model' => $request->input('default_model', config('harness.default.model')),

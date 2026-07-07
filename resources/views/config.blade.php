@@ -290,9 +290,115 @@
         @php
             $fgNodes = $config['feature_graph']['nodes'] ?? [];
             $activeFgCount = collect($fgNodes)->filter(fn($n) => ($n['enabled'] ?? false))->count();
+            $configMode = $config['config_mode'] ?? 'force';
+            $isForce = $configMode === 'force';
         @endphp
 
-        <!-- ── LAYER 1: GENERAL ── -->
+        {{-- ── CONFIG MODE SELECTOR ── --}}
+        <div class="qcfg-layer" id="layer-config-mode" style="--layer-color: #f39c12; margin-bottom: 28px;">
+            <div class="qcfg-layer-header" style="border-left: 3px solid #f39c12; background: rgba(243,156,18,0.06);">
+                <i class="bi bi-toggle-on qcfg-layer-icon" style="color:#f39c12; font-size:1.3rem;"></i>
+                <span class="qcfg-layer-title" style="color:#f39c12;">Config Mode</span>
+                <span class="qcfg-layer-subtitle">Controls how the Dirac Complexity Router interacts with your saved config</span>
+                <span class="badge ms-auto px-3 py-1" style="font-size:10px; background: {{ $isForce ? 'rgba(231,76,60,0.15)' : 'rgba(39,174,96,0.15)' }}; color: {{ $isForce ? '#e74c3c' : '#27ae60' }}; border: 1px solid {{ $isForce ? '#e74c3c' : '#27ae60' }}; border-radius:4px;">
+                    {{ $isForce ? '⚡ FORCE MODE ACTIVE' : '🌊 PHILOSOPHY MODE ACTIVE' }}
+                </span>
+            </div>
+
+            <div class="qcfg-nodes-row" style="gap:0">
+                {{-- FORCE MODE card --}}
+                <div class="qcfg-node config-mode-option {{ $isForce ? 'mode-selected' : '' }}"
+                     style="--node-color:#e74c3c; flex: 1 1 48%; cursor:pointer; transition: all 0.2s;"
+                     onclick="selectConfigMode('force')">
+                    <input type="radio" name="config_mode" id="mode_force" value="force" {{ $isForce ? 'checked' : '' }} style="display:none;">
+                    <div class="qcfg-node-header">
+                        <div class="qcfg-node-icon" style="color:#e74c3c; font-size:1.4rem;"><i class="bi bi-shield-lock-fill"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="qcfg-node-title" style="color:#e74c3c;">⚡ Force Mode</div>
+                            <div class="qcfg-node-key">config_mode = force</div>
+                        </div>
+                        <div class="mode-indicator" id="force-indicator" style="width:12px;height:12px;border-radius:50%;background:{{ $isForce ? '#e74c3c' : 'rgba(255,255,255,0.1)' }};transition:all 0.2s;box-shadow: {{ $isForce ? '0 0 8px #e74c3c' : 'none' }};"></div>
+                    </div>
+                    <div class="qcfg-node-desc">
+                        Manager config is <strong style="color:#e74c3c;">absolute</strong>. The Dirac Complexity Router classifies query domain for telemetry only — it <em>never overrides</em> any feature flag you set here. If you enable Semantic Cache and Quantum Memory, they will always run regardless of query type.
+                    </div>
+                    <div class="mt-2 p-2 rounded" style="background:rgba(231,76,60,0.06); border:1px solid rgba(231,76,60,0.15); font-size:11px; color:rgba(255,255,255,0.5);">
+                        <i class="bi bi-check-circle-fill text-danger me-1"></i> Cache &amp; memory run when <em>you</em> say so<br>
+                        <i class="bi bi-check-circle-fill text-danger me-1"></i> Mid-session config changes apply immediately<br>
+                        <i class="bi bi-info-circle me-1" style="color:rgba(255,255,255,0.3)"></i> Dirac domain used for telemetry only
+                    </div>
+                    <div class="card-arrow"><div class="card-arrow-top-left"></div><div class="card-arrow-top-right"></div><div class="card-arrow-bottom-left"></div><div class="card-arrow-bottom-right"></div></div>
+                </div>
+
+                <div style="width:14px; flex-shrink:0;"></div>
+
+                {{-- PHILOSOPHY MODE card --}}
+                <div class="qcfg-node config-mode-option {{ !$isForce ? 'mode-selected' : '' }}"
+                     style="--node-color:#27ae60; flex: 1 1 48%; cursor:pointer; transition: all 0.2s;"
+                     onclick="selectConfigMode('philosophy')">
+                    <input type="radio" name="config_mode" id="mode_philosophy" value="philosophy" {{ !$isForce ? 'checked' : '' }} style="display:none;">
+                    <div class="qcfg-node-header">
+                        <div class="qcfg-node-icon" style="color:#27ae60; font-size:1.4rem;"><i class="bi bi-activity"></i></div>
+                        <div class="flex-grow-1">
+                            <div class="qcfg-node-title" style="color:#27ae60;">🌊 Philosophy Mode</div>
+                            <div class="qcfg-node-key">config_mode = philosophy</div>
+                        </div>
+                        <div class="mode-indicator" id="philosophy-indicator" style="width:12px;height:12px;border-radius:50%;background:{{ !$isForce ? '#27ae60' : 'rgba(255,255,255,0.1)' }};transition:all 0.2s;box-shadow: {{ !$isForce ? '0 0 8px #27ae60' : 'none' }};"></div>
+                    </div>
+                    <div class="qcfg-node-desc">
+                        The <strong style="color:#27ae60;">Dirac Complexity Router</strong> decides which features are <em>used</em> during the loop based on query domain. Cache and memory are <strong style="color:#27ae60;">always initialised and always checked</strong> — the Dirac domain only controls whether a miss skips the loop or proceeds to full execution.
+                    </div>
+                    <div class="mt-2 p-2 rounded" style="background:rgba(39,174,96,0.06); border:1px solid rgba(39,174,96,0.15); font-size:11px; color:rgba(255,255,255,0.5);">
+                        <i class="bi bi-check-circle-fill me-1" style="color:#27ae60;"></i> Cache &amp; memory always initialised<br>
+                        <i class="bi bi-check-circle-fill me-1" style="color:#27ae60;"></i> Miss recorded in telemetry, never a teardown<br>
+                        <i class="bi bi-check-circle-fill me-1" style="color:#27ae60;"></i> Dirac domain controls loop usage, not init
+                    </div>
+                    <div class="card-arrow"><div class="card-arrow-top-left"></div><div class="card-arrow-top-right"></div><div class="card-arrow-bottom-left"></div><div class="card-arrow-bottom-right"></div></div>
+                </div>
+            </div>
+
+            {{-- Domain routing reference --}}
+            <div class="mt-3 p-3 rounded" style="background:rgba(243,156,18,0.04); border:1px solid rgba(243,156,18,0.1); font-size:11px;">
+                <div class="mb-2" style="color:#f39c12; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">
+                    <i class="bi bi-diagram-3 me-1"></i>Dirac Domain → Feature Usage (Philosophy Mode)
+                </div>
+                <div class="d-flex gap-3 flex-wrap">
+                    <div class="p-2 rounded" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); min-width:180px;">
+                        <div style="color:#3498db; font-weight:700; font-size:11px;">|Simple⟩</div>
+                        <div style="color:rgba(255,255,255,0.4); font-size:10px; margin-top:4px;">
+                            Cache: checked ✓ HIT exits<br>
+                            Quantum: initialised, skipped in loop<br>
+                            Ontology: skipped<br>
+                            Cognitive: skipped<br>
+                            Verification: skipped
+                        </div>
+                    </div>
+                    <div class="p-2 rounded" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); min-width:180px;">
+                        <div style="color:#f39c12; font-weight:700; font-size:11px;">|Complicated⟩</div>
+                        <div style="color:rgba(255,255,255,0.4); font-size:10px; margin-top:4px;">
+                            Cache: checked ✓<br>
+                            Quantum: checked ✓<br>
+                            Ontology: active ✓<br>
+                            Cognitive: skipped<br>
+                            Verification: skipped
+                        </div>
+                    </div>
+                    <div class="p-2 rounded" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); min-width:180px;">
+                        <div style="color:#e74c3c; font-weight:700; font-size:11px;">|Complex⟩</div>
+                        <div style="color:rgba(255,255,255,0.4); font-size:10px; margin-top:4px;">
+                            Cache: checked ✓<br>
+                            Quantum: active ✓<br>
+                            Ontology: active ✓<br>
+                            Cognitive: active ✓<br>
+                            Verification: active ✓
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ── LAYER 1: GENERAL ── --}}
+
         <div class="qcfg-layer" id="layer-general" style="--layer-color: #00d2ff">
             <div class="qcfg-layer-header">
                 <i class="bi bi-cpu qcfg-layer-icon"></i>
@@ -849,6 +955,63 @@
                 targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
+    });
+
+    /**
+     * Config Mode selector.
+     * Switches between 'force' and 'philosophy' without a page reload.
+     * The actual persistence happens on form submit.
+     */
+    function selectConfigMode(mode) {
+        // Update radio inputs
+        document.getElementById('mode_force').checked = (mode === 'force');
+        document.getElementById('mode_philosophy').checked = (mode === 'philosophy');
+
+        // Update card border glow
+        document.querySelectorAll('.config-mode-option').forEach(card => {
+            card.classList.remove('mode-selected');
+            card.style.borderColor = 'rgba(255,255,255,0.08)';
+            card.style.boxShadow = '0 4px 10px rgba(0,0,0,0.4)';
+        });
+
+        const forceCard = document.getElementById('mode_force').closest('.config-mode-option');
+        const philosophyCard = document.getElementById('mode_philosophy').closest('.config-mode-option');
+
+        if (mode === 'force') {
+            forceCard.classList.add('mode-selected');
+            forceCard.style.borderColor = '#e74c3c';
+            forceCard.style.boxShadow = '0 6px 20px rgba(0,0,0,0.5), 0 0 12px rgba(231,76,60,0.3)';
+            // Indicators
+            document.getElementById('force-indicator').style.background = '#e74c3c';
+            document.getElementById('force-indicator').style.boxShadow = '0 0 8px #e74c3c';
+            document.getElementById('philosophy-indicator').style.background = 'rgba(255,255,255,0.1)';
+            document.getElementById('philosophy-indicator').style.boxShadow = 'none';
+            // Badge
+            document.querySelector('#layer-config-mode .badge').textContent = '⚡ FORCE MODE ACTIVE';
+            document.querySelector('#layer-config-mode .badge').style.background = 'rgba(231,76,60,0.15)';
+            document.querySelector('#layer-config-mode .badge').style.color = '#e74c3c';
+            document.querySelector('#layer-config-mode .badge').style.borderColor = '#e74c3c';
+        } else {
+            philosophyCard.classList.add('mode-selected');
+            philosophyCard.style.borderColor = '#27ae60';
+            philosophyCard.style.boxShadow = '0 6px 20px rgba(0,0,0,0.5), 0 0 12px rgba(39,174,96,0.3)';
+            // Indicators
+            document.getElementById('philosophy-indicator').style.background = '#27ae60';
+            document.getElementById('philosophy-indicator').style.boxShadow = '0 0 8px #27ae60';
+            document.getElementById('force-indicator').style.background = 'rgba(255,255,255,0.1)';
+            document.getElementById('force-indicator').style.boxShadow = 'none';
+            // Badge
+            document.querySelector('#layer-config-mode .badge').textContent = '🌊 PHILOSOPHY MODE ACTIVE';
+            document.querySelector('#layer-config-mode .badge').style.background = 'rgba(39,174,96,0.15)';
+            document.querySelector('#layer-config-mode .badge').style.color = '#27ae60';
+            document.querySelector('#layer-config-mode .badge').style.borderColor = '#27ae60';
+        }
+    }
+
+    // Apply visual selected state on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const checked = document.querySelector('input[name="config_mode"]:checked');
+        if (checked) selectConfigMode(checked.value);
     });
 </script>
 </body>

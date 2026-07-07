@@ -15,6 +15,10 @@ class DraftVerificationStage implements PromptProcessorInterface
 {
     public function isEnabled(PromptContext $context): bool
     {
+        if (isset($context->philosophyFlags['use_draft_verification']) && ! $context->philosophyFlags['use_draft_verification']) {
+            return false;
+        }
+
         if (! function_exists('config')) {
             return false;
         }

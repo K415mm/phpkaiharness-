@@ -21,6 +21,8 @@ class PromptContext
 
     public ?AgentPrompt $laravelPrompt = null;
 
+    public array $philosophyFlags = [];
+
     public function __construct(
         public readonly string $userPrompt,
         public readonly string $systemPrompt,

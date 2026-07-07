@@ -20,6 +20,10 @@ class QuantumInjectionStage implements PromptProcessorInterface
 {
     public function isEnabled(PromptContext $context): bool
     {
+        if (isset($context->philosophyFlags['use_quantum']) && ! $context->philosophyFlags['use_quantum']) {
+            return false;
+        }
+
         return HarnessConfig::isNodeEnabled('quantum_harness', 'harness.quantum_harness.enabled', false);
     }
 
