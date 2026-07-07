@@ -442,6 +442,34 @@ Gate::define('viewHarness', function (User $user) {
 
 ---
 
+<h2 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;border-bottom:2px solid #3cd2a5;padding-bottom:8px;margin-top:30px">🖥️ Standalone Web Application Dashboard (Non-Laravel)</h2>
+
+<p style="color:#b1c2d4;line-height:1.6">
+  <code>phpkaiharness</code> is designed with ultimate modularity. If you are not using Laravel, or want to deploy the telemetry, trace runner, and configuration dashboard as a standalone web application, you can do so in seconds using the built-in standalone web app located in the <code>/ui</code> directory.
+</p>
+
+<h3 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;margin-top:20px">1. Running Standalone Web App</h3>
+<p style="color:#b1c2d4;line-height:1.6">
+  Launch the built-in development server pointing to the UI router:
+</p>
+<pre><code class="language-bash"># Run from the packages/phpkaiharness directory
+php -S localhost:8000 ui/router.php</code></pre>
+<p style="color:#b1c2d4;line-height:1.6">
+  Open your browser to <a href="http://localhost:8000" style="color:#3cd2a5">http://localhost:8000</a> to access the cyber-teal dashboard.
+</p>
+
+<h3 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;margin-top:20px">2. Standalone Session and Configuration Store</h3>
+<ul style="color:#b1c2d4;font-family:sans-serif;line-height:1.8">
+  <li>
+    <strong>Autopilot API Engine</strong> (<code>ui/api.php</code>): Directly interfaces with standalone scripts to record runs, traces, and metrics.
+  </li>
+  <li>
+    <strong>Independent SQLite Storage</strong>: Automatically seeds and persists settings, model parameters, and telemetry events in <code>storage/app/phpkaiharness/agent_memory.sqlite</code> without requiring a MySQL/PostgreSQL host database.
+  </li>
+</ul>
+
+---
+
 <h2 style="color:#3cd2a5;font-family:'Courier New',Courier,monospace;border-bottom:2px solid #3cd2a5;padding-bottom:8px;margin-top:30px">🔧 Configuration Reference</h2>
 
 All features are togglable via `config/harness.php` and persist through the dashboard UI:
