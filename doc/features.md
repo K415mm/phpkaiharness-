@@ -8,18 +8,17 @@ A complete reference for all features, safety layers, and optimization systems i
 
 | Feature | Config Key | Default | Status in Dashboard |
 |---|---|---|---|
-| Semantic Cache | `semantic_cache.enabled` | `true` | 🟢 ACTIVE / 🔴 DEACTIVATED |
+| Semantic Cache | `feature_graph.nodes.semantic_cache.enabled` | `true` | 🟢 ACTIVE / 🔴 DEACTIVATED |
 | PII Masking | `pii_masking.enabled` | `true` | 🟢 / 🔴 |
 | Rate Limiting | `rate_limiting.enabled` | `true` | 🟢 / 🔴 |
-| Guardrails | `guardrails.enabled` | `true` | 🟢 / 🔴 |
-| Model Prompt Optimizer | `model_prompt_optimizer.enabled` | `true` | 🟢 / 🔴 |
-| Ontological Injector | `ontological_injector.enabled` | `true` | 🟢 / 🔴 |
-| Thinking Budget | `thinking_budget.enabled` | `false` | 🟢 / 🔴 |
-| Cognitive Graph Memory | `cognitive_graph_memory.enabled` | `true` | 🟢 / 🔴 |
-| Draft Verification | `draft_verification.enabled` | `false` | 🟢 / 🔴 |
-| Context Compactor | `context_compactor.enabled` | `true` | 🟢 / 🔴 |
-| LLM Failover | `llm_failover.enabled` | `true` | 🟢 / 🔴 |
-| Streaming | `streaming.enabled` | `false` | 🟢 / 🔴 |
+| Guardrails | `feature_graph.nodes.guardrails.enabled` | `true` | 🟢 / 🔴 |
+| Model Prompt Optimizer | `feature_graph.nodes.model_optimizer.enabled` | `true` | 🟢 / 🔴 |
+| Ontological RAG Injector | `feature_graph.nodes.ontology_injection.enabled` | `false` | 🟢 / 🔴 |
+| Thinking Budget | `budget.enabled` | `true` | 🟢 / 🔴 |
+| Cognitive Graph Memory | `feature_graph.nodes.cognitive_memory.enabled` | `true` | 🟢 / 🔴 |
+| Draft Verification | `feature_graph.nodes.draft_verification.enabled` | `false` | 🟢 / 🔴 |
+| Context Compactor | `feature_graph.nodes.context_compactor.enabled` | `true` | 🟢 / 🔴 |
+| Quantum Memory Harness | `feature_graph.nodes.quantum_harness.enabled` | `false` | 🟢 / 🔴 |
 
 > **Config changes save immediately** and are picked up on the next agent loop invocation — no server restart required.
 
@@ -106,9 +105,18 @@ graph TD
 
 **Configuration:**
 ```php
-'semantic_cache' => [
+'cache' => [
     'enabled'   => true,
     'threshold' => 0.88,   // 88% similarity = cache hit
+    'redis' => [
+        'enabled' => true,
+        'decay_mode' => 'dissipative',
+        'subjective_field' => [
+            'enabled' => true,
+            'bias_weight' => 0.15,
+        ],
+    ],
+    'verify_with_llm' => true,
 ],
 ```
 

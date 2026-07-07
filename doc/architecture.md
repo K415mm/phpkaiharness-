@@ -83,61 +83,74 @@ The following sequence tracks the lifecycle of a single prompt from entry to fin
 ```mermaid
 sequenceDiagram
     autonumber
-    actor App as Host Application
-    participant Boot as EnvironmentBootstrap
-    participant Cache as SemanticCache
+    actor App as Host App / Client
+    participant Router as ComplexityRouter
+    participant Cache as L1/L2 Cache (Redis+SQLite)
     participant PII as PiiMaskingClient
     participant Rate as RateLimitedClient
-    participant Ontology as OntologicalInjector
+    participant Ontology as OntologicalRAG
     participant Optimizer as ModelPromptOptimizer
-    participant Thinking as ThinkingBudgetClient
-    participant LLM as LLM Provider
+    participant Loop as AgentLoop (Executor)
+    participant LLM as Qwen Cloud (DashScope)
     participant Guard as PolicyGuardrails
     participant Tools as ToolRegistry
-    participant GraphMem as CognitiveGraphMemory
-    participant Draft as DraftVerification
+    participant Quantum as QuantumMemory
     participant Store as SqliteMonitorStore
 
-    App->>Boot: handle($prompt, $history)
-    Boot->>Cache: lookup($prompt)
-    Cache-->>Boot: Hit → return cached response (exit early)
-    Boot->>PII: mask($prompt)
-    PII-->>Boot: sanitized prompt
-    Boot->>Rate: checkBucket()
-    Rate-->>Boot: OK or throttle exception
+    App->>Router: handle($prompt, $history)
+    Router->>LLM: Project query state in Hilbert space (using qwen-turbo)
+    LLM-->>Router: Project density matrix → collapses (Simple/Complicated/Complex)
+    
+    alt Simple Domain
+        Router->>LLM: Direct LLM generation
+        LLM-->>Router: Final Response
+        Router-->>App: Direct response (bypass all pipeline features)
+    else Complicated Domain
+        Router->>Ontology: Inject Ontological context (RAG)
+        Router->>LLM: LLM generation with context
+        LLM-->>Router: Final Response
+        Router-->>App: RAG response (bypass loop iteration)
+    else Complex Domain
+        Router->>Cache: lookup($prompt)
+        Cache->>Cache: Redis L1 match + SQLite model verification + LLM verification pass
+        Cache-->>Router: Hit → return cached response (exit early)
+        
+        Router->>PII: mask($prompt)
+        PII-->>Router: sanitized prompt
+        Router->>Rate: checkBucket()
+        Rate-->>Router: OK or throttle exception
 
-    loop Max Iterations (default 10)
-        Boot->>Ontology: injectContext($history)
-        Ontology-->>Boot: enriched history with RAG records
-        Boot->>Optimizer: rewriteSystemPrompt($model)
-        Optimizer-->>Boot: model-tuned prompt
-        Boot->>Thinking: prependReasoningBudget($history)
-        Thinking->>LLM: POST /chat/completions
-        LLM-->>Thinking: text + tool_calls[]
-        Thinking->>Store: recordLlmTrace(tokens, duration)
+        loop Max Iterations
+            Router->>Loop: runAgentLoop()
+            Loop->>Ontology: injectContext($history)
+            Ontology-->>Loop: enriched history with RAG records
+            Loop->>Optimizer: rewriteSystemPrompt($model)
+            Optimizer-->>Loop: model-tuned prompt
+            Loop->>LLM: chat() via QwenClient
+            LLM-->>Loop: text + tool_calls[]
+            Loop->>Store: recordLlmTrace(tokens, duration)
 
-        alt No Tool Calls
-            Thinking->>Draft: verifyDraft($response)
-            Draft-->>Thinking: verified or corrected response
-            Thinking-->>App: Final Response (exit loop)
-        end
+            alt No Tool Calls
+                Loop->>Quantum: ingestEpisodicMemory($response)
+                Quantum->>Quantum: Calculate phase interference & entanglement pairing
+                Loop-->>Router: Final response (exit loop)
+            end
 
-        loop For each tool_call
-            Thinking->>Guard: validate($toolName, $args)
-            Guard-->>Thinking: Allowed / Blocked
-            alt Allowed
-                Thinking->>Tools: execute($toolName, $args)
-                Tools-->>Thinking: result string
-                Thinking->>GraphMem: extractAndStore($result)
-                Thinking->>Store: recordToolTrace(duration)
-                Thinking->>Thinking: append tool result to history
-            else Blocked
-                Thinking->>Thinking: append blocked status to history
+            loop For each tool_call
+                Loop->>Guard: validate($toolName, $args)
+                Guard-->>Loop: Allowed / Blocked
+                alt Allowed
+                    Loop->>Tools: execute($toolName, $args)
+                    Tools-->>Loop: result string
+                    Loop->>Store: recordToolTrace(duration)
+                    Loop->>Loop: append tool result to history
+                else Blocked
+                    Loop->>Loop: append blocked status to history
+                end
             end
         end
+        Router-->>App: Final Response
     end
-
-    Thinking-->>App: iteration limit message
 ```
 
 ---
